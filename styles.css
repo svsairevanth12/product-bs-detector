@@ -1,0 +1,105 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background-color: #f9fafb;
+    color: #1f2937;
+}
+
+.hidden { display: none; }
+
+/* API Key Screen */
+#setup-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+input[type="password"] {
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #2563eb;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+
+button:hover { background-color: #1d4ed8; }
+button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+/* Main UI */
+.header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 10px;
+}
+
+h1 { font-size: 18px; margin: 0; color: #111827; }
+h2 { font-size: 14px; color: #6b7280; margin: 0; }
+
+#product-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #374151;
+}
+
+/* Scorecard */
+.score-box {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.score-val {
+    font-size: 48px;
+    font-weight: 800;
+}
+
+.score-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6b7280;
+}
+
+/* Sections */
+.section { margin-bottom: 15px; }
+.section-title { font-weight: bold; font-size: 13px; margin-bottom: 5px; }
+
+.verdict {
+    background-color: #eff6ff;
+    border-left: 4px solid #2563eb;
+    padding: 10px;
+    font-size: 14px;
+    border-radius: 0 4px 4px 0;
+}
+
+ul { padding-left: 20px; margin: 0; font-size: 13px; }
+li { margin-bottom: 4px; }
+
+.dealbreaker-item { color: #dc2626; }
+.pro-item { color: #059669; }
+
+.loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #2563eb;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
