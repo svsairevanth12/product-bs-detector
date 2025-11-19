@@ -53,13 +53,23 @@ Since this is a custom developer extension, you will load it manually:
 
 ## 🚀 Backend Setup (Optional)
 
-For scalable, production-ready deployment with caching and rate limiting:
+For scalable, production-ready deployment with caching and **unlimited access**:
 
-### Quick Start
+### Quick Start - Unlimited Mode ⚡
+```bash
+cd backend
+cp .env.unlimited .env
+# Edit .env and add your POLLINATIONS_API_TOKEN
+npm install
+npm start
+```
+**See [QUICKSTART_UNLIMITED.md](QUICKSTART_UNLIMITED.md) for 2-minute setup guide!**
+
+### Interactive Setup
 ```bash
 cd backend
 chmod +x start.sh
-./start.sh
+./start.sh  # Choose unlimited or standard mode
 ```
 
 ### Manual Setup
