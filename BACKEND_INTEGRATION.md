@@ -176,23 +176,43 @@ Update the setup screen text to reflect backend mode:
 </div>
 ```
 
-## 🔐 Authentication Modes
+## 🔐 Access Tiers & Configuration
+
+### Unlimited Access Mode (Recommended) 🚀
+```bash
+# Backend .env configuration:
+RATE_LIMIT_ENABLED=false
+POLLINATIONS_API_TOKEN=your_token_here
+
+# Perfect for:
+- Users with unlimited Pollinations access (Nectar tier)
+- Production deployments
+- High-volume usage
+- Development without rate limit interruptions
+```
+
+**See [backend/UNLIMITED_MODE.md](backend/UNLIMITED_MODE.md) for detailed setup.**
 
 ### Anonymous Mode (No Token)
 ```javascript
 // Extension: Leave API key empty
-// Backend: Works with 15s rate limit per request
+// Backend: Works with rate limits (100 req/15min)
 ```
 
 ### Seed Tier (Free Token)
 ```javascript
 // Extension: Enter Pollinations token
-// Backend: 5s rate limit, better performance
+// Backend: Higher rate limits if RATE_LIMIT_ENABLED=true
 // Get token: https://auth.pollinations.ai/
 ```
 
-### Premium Tiers
-Contact Pollinations for Flower/Nectar tiers for higher rate limits.
+### Standard Mode (With Rate Limits)
+```bash
+# Backend .env configuration:
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_MAX_REQUESTS=100
+POLLINATIONS_API_TOKEN=your_token_here
+```
 
 ## 🧪 Testing
 

@@ -34,15 +34,24 @@ npm install
 ```
 
 3. **Configure environment variables:**
+
+**For Unlimited Access (Recommended):**
 ```bash
-cp .env.example .env
+cp .env.unlimited .env
 ```
 
 Edit `.env` file and add your Pollinations API token:
 ```env
 POLLINATIONS_API_TOKEN=your_token_here
+RATE_LIMIT_ENABLED=false
 PORT=3000
-NODE_ENV=development
+NODE_ENV=production
+```
+
+**For Standard/Free Tier:**
+```bash
+cp .env.example .env
+# Edit .env and set RATE_LIMIT_ENABLED=true
 ```
 
 4. **Start the development server:**
@@ -185,11 +194,25 @@ All configuration is managed through environment variables:
 | `NODE_ENV` | `development` | Environment (development/production) |
 | `POLLINATIONS_API_TOKEN` | - | Your Pollinations API token |
 | `POLLINATIONS_MODEL` | `searchgpt` | AI model to use |
-| `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per window |
+| `RATE_LIMIT_ENABLED` | `false` | Enable/disable rate limiting (false = unlimited) |
+| `RATE_LIMIT_MAX_REQUESTS` | `10000` | Max requests per window (if enabled) |
 | `RATE_LIMIT_WINDOW_MS` | `900000` | Rate limit window (15 min) |
 | `CACHE_TTL` | `3600` | Cache time-to-live (1 hour) |
+| `API_TIMEOUT` | `60000` | API request timeout (60 seconds) |
 | `ALLOWED_ORIGINS` | `*` | CORS allowed origins |
 | `LOG_LEVEL` | `info` | Logging level |
+
+### 🚀 Unlimited Access Mode
+
+If you have unlimited Pollinations API access, configure for maximum performance:
+
+```env
+RATE_LIMIT_ENABLED=false     # Disable rate limiting
+CACHE_TTL=7200               # 2 hour cache
+API_TIMEOUT=60000            # 60 second timeout
+```
+
+The backend will automatically detect unlimited mode and optimize accordingly.
 
 ## 📊 Monitoring & Logging
 

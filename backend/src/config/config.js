@@ -10,12 +10,14 @@ const config = {
     apiToken: process.env.POLLINATIONS_API_TOKEN,
     baseUrl: process.env.POLLINATIONS_API_BASE_URL || 'https://text.pollinations.ai',
     model: process.env.POLLINATIONS_MODEL || 'searchgpt',
-    timeout: 30000, // 30 seconds
+    timeout: parseInt(process.env.API_TIMEOUT) || 60000, // 60 seconds for unlimited mode
+    unlimitedMode: process.env.RATE_LIMIT_ENABLED === 'false', // Auto-detect unlimited mode
   },
 
   rateLimit: {
+    enabled: process.env.RATE_LIMIT_ENABLED !== 'false', // Can disable rate limiting
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000, // High default for unlimited access
   },
 
   cache: {

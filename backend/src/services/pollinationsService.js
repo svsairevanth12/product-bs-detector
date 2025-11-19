@@ -97,8 +97,12 @@ Do not include any text before or after the JSON. Return ONLY the JSON object.`;
           model: model,
           jsonMode: true, // Enable JSON mode for structured output
           seed: 42, // Consistent results for same input
+          // No rate limiting on model side - let backend handle it
         },
         timeout: config.pollinations.timeout,
+        // Unlimited mode - allow longer processing
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       };
 
       // Add authentication if token is available

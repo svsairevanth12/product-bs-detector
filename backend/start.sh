@@ -7,8 +7,23 @@ echo "===================================="
 
 # Check if .env exists
 if [ ! -f .env ]; then
-    echo "📝 Creating .env file from template..."
-    cp .env.example .env
+    echo "📝 Select configuration mode:"
+    echo "   1) Unlimited Access (No rate limits)"
+    echo "   2) Standard/Free Tier (With rate limits)"
+    echo ""
+    read -p "Enter choice [1 or 2]: " choice
+
+    if [ "$choice" = "1" ]; then
+        echo "🚀 Using unlimited access configuration..."
+        cp .env.unlimited .env
+        echo "⚡ Unlimited mode - no rate limits!"
+    else
+        echo "📊 Using standard configuration..."
+        cp .env.example .env
+        echo "✅ Standard mode with rate limiting"
+    fi
+
+    echo ""
     echo "⚠️  Please edit .env and add your POLLINATIONS_API_TOKEN"
     echo "   Get your token at: https://auth.pollinations.ai/"
     echo ""

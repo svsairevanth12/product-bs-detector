@@ -49,21 +49,29 @@ app.use(compression());
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
-  message: {
-    success: false,
-    error: 'Too many requests, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Skip rate limiting for health checks
-  skip: (req) => req.path === '/api/health'
-});
+// Rate limiting (optional - can be disabled for unlimited access)
+if (config.rateLimit.enabled) {
+  const limiter = rateLimit({
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.maxRequests,
+    message: {
+      success: false,
+      error: 'Too many requests, please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip rate limiting for health checks
+    skip: (req) => req.path === '/api/health'
+  });
 
-app.use('/api', limiter);
+  app.use('/api', limiter);
+  logger.info('Rate limiting enabled', {
+    maxRequests: config.rateLimit.maxRequests,
+    windowMs: config.rateLimit.windowMs
+  });
+} else {
+  logger.info('⚡ Rate limiting DISABLED - Unlimited access mode');
+}
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -109,8 +117,14 @@ app.listen(PORT, () => {
     environment: config.server.env,
     model: config.pollinations.model,
     hasToken: !!config.pollinations.apiToken,
-    cacheEnabled: true
+    cacheEnabled: true,
+    rateLimitEnabled: config.rateLimit.enabled,
+    unlimitedMode: config.pollinations.unlimitedMode
   });
+
+  if (config.pollinations.unlimitedMode) {
+    logger.info(`⚡ UNLIMITED ACCESS MODE - No rate limits applied!`);
+  }
 
   logger.info(`📚 API Documentation: http://localhost:${PORT}`);
   logger.info(`💚 Health Check: http://localhost:${PORT}/api/health`);
