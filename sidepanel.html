@@ -6,13 +6,14 @@
 </head>
 <body>
 
-    <!-- Setup Screen -->
+    <!-- Setup Screen (Backend URL Configuration) -->
     <div id="setup-screen">
         <h2>Configuration</h2>
-        <p style="font-size:12px;">Enter your Google Gemini API Key:</p>
-        <input type="password" id="api-key-input" placeholder="AIzaSy..." />
-        <button id="save-key-btn">Save Key</button>
-        <p style="font-size:10px; color:#666;">Key is stored locally in your browser.</p>
+        <p style="font-size:12px;">Enter Backend API URL:</p>
+        <input type="text" id="api-url-input" placeholder="http://localhost:8000" />
+        <button id="save-url-btn">Save URL</button>
+        <p style="font-size:10px; color:#666;">Default: http://localhost:8000</p>
+        <p style="font-size:9px; color:#999;">No API key needed! Backend handles everything.</p>
     </div>
 
     <!-- Main Analysis Screen -->
@@ -56,7 +57,7 @@
         </div>
 
         <button id="analyze-btn" style="width:100%; margin-top:10px;">Analyze This Page</button>
-        <button id="change-key-btn" style="background:none; color:#999; border:none; font-size:10px; width:100%; margin-top:10px;">Change API Key</button>
+        <button id="change-url-btn" style="background:none; color:#999; border:none; font-size:10px; width:100%; margin-top:10px;">Change Backend URL</button>
     </div>
 
     <script src="sidepanel.js"></script>

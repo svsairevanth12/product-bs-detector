@@ -1,45 +1,37 @@
-// Configuration - Now using backend API!
-const DEFAULT_BACKEND_URL = "http://localhost:8000";
+// Configuration
+// We use gemini-2.0-flash because it currently has the most stable JSON mode + Search combination.
+const MODEL_NAME = "gemini-2.0-flash"; 
 
 // DOM Elements
 const setupScreen = document.getElementById('setup-screen');
 const mainScreen = document.getElementById('main-screen');
-const apiUrlInput = document.getElementById('api-url-input');
-const saveUrlBtn = document.getElementById('save-url-btn');
+const apiKeyInput = document.getElementById('api-key-input');
+const saveKeyBtn = document.getElementById('save-key-btn');
 const analyzeBtn = document.getElementById('analyze-btn');
-const changeUrlBtn = document.getElementById('change-url-btn');
+const changeKeyBtn = document.getElementById('change-key-btn');
 const loadingState = document.getElementById('loading-state');
 const resultsArea = document.getElementById('results-area');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    const backendUrl = await getStorage('backendUrl');
-    if (backendUrl) {
+    const key = await getStorage('geminiApiKey');
+    if (key) {
         showMainScreen();
     } else {
-        // Set default value
-        apiUrlInput.value = DEFAULT_BACKEND_URL;
         setupScreen.classList.remove('hidden');
     }
 });
 
-// URL Management
-saveUrlBtn.addEventListener('click', async () => {
-    let url = apiUrlInput.value.trim();
-    if (!url) {
-        url = DEFAULT_BACKEND_URL;
-    }
-
-    // Remove trailing slash
-    url = url.replace(/\/$/, '');
-
-    await setStorage({ backendUrl: url });
+// Key Management
+saveKeyBtn.addEventListener('click', async () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) return;
+    await setStorage({ geminiApiKey: key });
     showMainScreen();
 });
 
-changeUrlBtn.addEventListener('click', async () => {
-    const currentUrl = await getStorage('backendUrl');
-    apiUrlInput.value = currentUrl || DEFAULT_BACKEND_URL;
+changeKeyBtn.addEventListener('click', async () => {
+    await setStorage({ geminiApiKey: null });
     mainScreen.classList.add('hidden');
     setupScreen.classList.remove('hidden');
     resultsArea.classList.add('hidden');
@@ -61,16 +53,16 @@ analyzeBtn.addEventListener('click', async () => {
     analyzeBtn.disabled = true;
 
     try {
-        const backendUrl = await getStorage('backendUrl') || DEFAULT_BACKEND_URL;
-        const currentTab = await getCurrentTab();
-        const analysis = await callBackendAPI(backendUrl, productText, currentTab?.url);
+        const apiKey = await getStorage('geminiApiKey');
+        const analysis = await callGeminiAPI(apiKey, productText);
         renderResults(analysis);
     } catch (error) {
         console.error("Analysis failed:", error);
+        // FALLBACK: Show the error as the verdict so you know what happened
         renderResults({
             real_score: 0,
             verdict: "Error: " + error.message,
-            dealbreakers: ["Check backend connection", "Ensure backend is running"],
+            dealbreakers: ["Check API Key", "Try a different product page"],
             pros: [],
             source_count: 0
         });
@@ -80,17 +72,11 @@ analyzeBtn.addEventListener('click', async () => {
     }
 });
 
-// Get current tab info
-async function getCurrentTab() {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tab;
-}
-
-// Scrape the page safely
+// 1. Scrape the page safely
 async function getCurrentTabProduct() {
-    const tab = await getCurrentTab();
-
-    if (!tab || !tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) {
         document.getElementById('product-title').innerText = "System Page (Cannot Analyze)";
         analyzeBtn.disabled = true;
         return;
@@ -116,41 +102,74 @@ async function getCurrentTabProduct() {
     });
 }
 
-// Call Backend API (Pollinations Proxy)
-async function callBackendAPI(backendUrl, productTitle, productUrl = null) {
-    const endpoint = `${backendUrl}/api/v1/analyze`;
+// 2. Call Gemini (Unbreakable Version)
+async function callGeminiAPI(apiKey, productTitle) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+    const prompt = `
+    You are a cynical consumer investigator. Analyze this product: "${productTitle}".
+    
+    1. Use Google Search to find discussions on Reddit, YouTube, and independent forums.
+    2. Ignore marketing fluff. Look for "dealbreakers".
+    3. Determine if this is a high-quality item or generic "dropshipped" junk.
+    `;
 
     const payload = {
-        product_title: productTitle,
-        product_url: productUrl
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} }], // Search Grounding
+        generationConfig: {
+            responseMimeType: "application/json",
+            // FORCE VALID JSON SCHEMA
+            responseSchema: {
+                type: "OBJECT",
+                properties: {
+                    real_score: { type: "NUMBER" },
+                    verdict: { type: "STRING" },
+                    dealbreakers: { 
+                        type: "ARRAY", 
+                        items: { type: "STRING" } 
+                    },
+                    pros: { 
+                        type: "ARRAY", 
+                        items: { type: "STRING" } 
+                    },
+                    source_count: { type: "NUMBER" }
+                },
+                required: ["real_score", "verdict", "dealbreakers", "pros"]
+            }
+        }
     };
 
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (data.error) throw new Error(data.error.message || "API Error");
+    if (!data.candidates || !data.candidates[0].content) throw new Error("No content returned");
+
+    const rawText = data.candidates[0].content.parts[0].text;
+
     try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || `Backend error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return data;
-
-    } catch (error) {
-        if (error.message.includes('Failed to fetch')) {
-            throw new Error("Cannot connect to backend. Is it running?");
-        }
-        throw error;
+        // Because we used responseSchema, we can parse directly without regex hacks
+        return JSON.parse(rawText);
+    } catch (e) {
+        console.warn("JSON Parse failed despite schema:", rawText);
+        // EMERGENCY FALLBACK: If it's still not JSON, return the raw text as the verdict
+        return {
+            real_score: 0,
+            verdict: rawText, // Just show the user whatever the AI wrote
+            dealbreakers: ["Could not format data"],
+            pros: [],
+            source_count: 0
+        };
     }
 }
 
-// Render Results
+// 3. Render Results
 function renderResults(data) {
     document.getElementById('real-score').innerText = data.real_score;
     document.getElementById('verdict-text').innerText = data.verdict;
