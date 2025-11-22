@@ -1,74 +1,45 @@
 // Configuration
-// We use gemini-2.0-flash because it currently has the most stable JSON mode + Search combination.
-const MODEL_NAME = "gemini-2.0-flash"; 
+const BACKEND_URL = "http://localhost:8000/analyze";
 
 // DOM Elements
-const setupScreen = document.getElementById('setup-screen');
-const mainScreen = document.getElementById('main-screen');
-const apiKeyInput = document.getElementById('api-key-input');
-const saveKeyBtn = document.getElementById('save-key-btn');
 const analyzeBtn = document.getElementById('analyze-btn');
-const changeKeyBtn = document.getElementById('change-key-btn');
 const loadingState = document.getElementById('loading-state');
 const resultsArea = document.getElementById('results-area');
+const productTitleEl = document.getElementById('product-title');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    const key = await getStorage('geminiApiKey');
-    if (key) {
-        showMainScreen();
-    } else {
-        setupScreen.classList.remove('hidden');
-    }
-});
-
-// Key Management
-saveKeyBtn.addEventListener('click', async () => {
-    const key = apiKeyInput.value.trim();
-    if (!key) return;
-    await setStorage({ geminiApiKey: key });
-    showMainScreen();
-});
-
-changeKeyBtn.addEventListener('click', async () => {
-    await setStorage({ geminiApiKey: null });
-    mainScreen.classList.add('hidden');
-    setupScreen.classList.remove('hidden');
-    resultsArea.classList.add('hidden');
+    getCurrentTabProduct();
 });
 
 // Main Logic
-function showMainScreen() {
-    setupScreen.classList.add('hidden');
-    mainScreen.classList.remove('hidden');
-    getCurrentTabProduct();
-}
-
 analyzeBtn.addEventListener('click', async () => {
-    const productText = document.getElementById('product-title').innerText;
-    if (!productText || productText.includes("Loading")) return;
+    const productText = productTitleEl.innerText;
+    if (!productText || productText.includes("Loading") || productText.includes("System Page")) return;
 
     loadingState.classList.remove('hidden');
     resultsArea.classList.add('hidden');
     analyzeBtn.disabled = true;
+    analyzeBtn.innerText = "Analyzing...";
 
     try {
-        const apiKey = await getStorage('geminiApiKey');
-        const analysis = await callGeminiAPI(apiKey, productText);
+        // 1. Call our Backend Proxy
+        const analysis = await callBackendAPI(productText);
         renderResults(analysis);
     } catch (error) {
         console.error("Analysis failed:", error);
-        // FALLBACK: Show the error as the verdict so you know what happened
+        // FALLBACK: Show the error
         renderResults({
             real_score: 0,
-            verdict: "Error: " + error.message,
-            dealbreakers: ["Check API Key", "Try a different product page"],
+            verdict: "Error: " + error.message + ". Ensure the backend is running at localhost:8000.",
+            dealbreakers: ["Connection Failed"],
             pros: [],
             source_count: 0
         });
     } finally {
         loadingState.classList.add('hidden');
         analyzeBtn.disabled = false;
+        analyzeBtn.innerText = "Analyze This Page";
     }
 });
 
@@ -76,8 +47,8 @@ analyzeBtn.addEventListener('click', async () => {
 async function getCurrentTabProduct() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) {
-        document.getElementById('product-title').innerText = "System Page (Cannot Analyze)";
+    if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://") || tab.url.startsWith("about:")) {
+        productTitleEl.innerText = "System Page (Cannot Analyze)";
         analyzeBtn.disabled = true;
         return;
     }
@@ -86,87 +57,76 @@ async function getCurrentTabProduct() {
         target: { tabId: tab.id },
         func: () => {
             let title = "";
-            const amzn = document.getElementById('productTitle');
-            const h1 = document.querySelector('h1');
-            if (amzn) title = amzn.innerText;
-            else if (h1) title = h1.innerText;
-            else title = document.title;
+            // Try multiple selectors for better coverage
+            const selectors = [
+                '#productTitle', // Amazon
+                'h1.product-title', // Generic
+                'h1.product_title', // WooCommerce
+                'h1.pdp-title', // BestBuy etc
+                'h1' // Fallback
+            ];
+
+            for (const selector of selectors) {
+                const el = document.querySelector(selector);
+                if (el && el.innerText.trim().length > 0) {
+                    title = el.innerText;
+                    break;
+                }
+            }
+
+            if (!title) title = document.title;
             return title.trim();
         }
     }, (results) => {
         if (chrome.runtime.lastError || !results || !results[0]) {
-            document.getElementById('product-title').innerText = tab.title || "Unknown Product";
+            productTitleEl.innerText = tab.title || "Unknown Product";
         } else {
-            document.getElementById('product-title').innerText = results[0].result.substring(0, 80) + "...";
+            // We display a truncated version, but we should ideally store the full version for the API
+            // For now, we just use the innerText which might be long, CSS handles wrapping/truncation if needed
+            const fullTitle = results[0].result;
+            productTitleEl.innerText = fullTitle;
+            // Store full title in dataset if we want to be precise later
+            productTitleEl.dataset.fullTitle = fullTitle;
         }
     });
 }
 
-// 2. Call Gemini (Unbreakable Version)
-async function callGeminiAPI(apiKey, productTitle) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+// 2. Call Backend Proxy
+async function callBackendAPI(productTitle) {
+    // Use the full title if available
+    const titleToSend = productTitleEl.dataset.fullTitle || productTitle;
 
-    const prompt = `
-    You are a cynical consumer investigator. Analyze this product: "${productTitle}".
-    
-    1. Use Google Search to find discussions on Reddit, YouTube, and independent forums.
-    2. Ignore marketing fluff. Look for "dealbreakers".
-    3. Determine if this is a high-quality item or generic "dropshipped" junk.
-    `;
-
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ googleSearch: {} }], // Search Grounding
-        generationConfig: {
-            responseMimeType: "application/json",
-            // FORCE VALID JSON SCHEMA
-            responseSchema: {
-                type: "OBJECT",
-                properties: {
-                    real_score: { type: "NUMBER" },
-                    verdict: { type: "STRING" },
-                    dealbreakers: { 
-                        type: "ARRAY", 
-                        items: { type: "STRING" } 
-                    },
-                    pros: { 
-                        type: "ARRAY", 
-                        items: { type: "STRING" } 
-                    },
-                    source_count: { type: "NUMBER" }
-                },
-                required: ["real_score", "verdict", "dealbreakers", "pros"]
-            }
-        }
-    };
-
-    const response = await fetch(url, {
+    const response = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ product_title: titleToSend })
     });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Backend Error (${response.status}): ${errorText}`);
+    }
 
     const data = await response.json();
 
-    if (data.error) throw new Error(data.error.message || "API Error");
-    if (!data.candidates || !data.candidates[0].content) throw new Error("No content returned");
-
-    const rawText = data.candidates[0].content.parts[0].text;
-
-    try {
-        // Because we used responseSchema, we can parse directly without regex hacks
-        return JSON.parse(rawText);
-    } catch (e) {
-        console.warn("JSON Parse failed despite schema:", rawText);
-        // EMERGENCY FALLBACK: If it's still not JSON, return the raw text as the verdict
-        return {
-            real_score: 0,
-            verdict: rawText, // Just show the user whatever the AI wrote
-            dealbreakers: ["Could not format data"],
-            pros: [],
-            source_count: 0
-        };
+    // The backend returns a JSON string or object.
+    // If the backend returns a stringified JSON (due to LLM output), parse it.
+    if (typeof data === 'string') {
+        try {
+            return JSON.parse(data);
+        } catch (e) {
+             // If it's just text, return a fallback object
+             return {
+                real_score: 0,
+                verdict: data,
+                dealbreakers: [],
+                pros: [],
+                source_count: 0
+            };
+        }
     }
+
+    return data;
 }
 
 // 3. Render Results
@@ -178,7 +138,7 @@ function renderResults(data) {
     // Color Code Score
     const score = parseFloat(data.real_score);
     const scoreEl = document.getElementById('real-score');
-    scoreEl.style.color = (score < 3.0) ? "#dc2626" : (score < 4.0) ? "#d97706" : "#059669";
+    scoreEl.style.color = (score < 3.0) ? "#ef4444" : (score < 4.0) ? "#f59e0b" : "#10b981"; // Tailwind colors
 
     // Lists
     const consList = document.getElementById('cons-list');
@@ -191,7 +151,7 @@ function renderResults(data) {
             consList.appendChild(li);
         });
     } else {
-        consList.innerHTML = "<li style='color:#999'>None found</li>";
+        consList.innerHTML = "<li style='color:#64748b'>None found</li>";
     }
 
     const prosList = document.getElementById('pros-list');
@@ -204,21 +164,8 @@ function renderResults(data) {
             prosList.appendChild(li);
         });
     } else {
-        prosList.innerHTML = "<li style='color:#999'>None found</li>";
+        prosList.innerHTML = "<li style='color:#64748b'>None found</li>";
     }
 
     resultsArea.classList.remove('hidden');
-}
-
-// Helpers
-function getStorage(key) {
-    return new Promise((resolve) => {
-        chrome.storage.local.get([key], (result) => resolve(result[key]));
-    });
-}
-
-function setStorage(obj) {
-    return new Promise((resolve) => {
-        chrome.storage.local.set(obj, resolve);
-    });
 }
